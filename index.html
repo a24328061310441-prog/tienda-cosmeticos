@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tienda Cosméticos</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', Arial;
+    background: linear-gradient(135deg, #f8f9fa, #ffe4ec);
+    margin: 0;
+    text-align: center;
+}
+
+header {
+    background: linear-gradient(90deg, #eb90bd, #fcafd5);
+    color: white;
+    padding: 20px;
+    font-size: 22px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.container {
+    padding: 20px;
+}
+
+h3 {
+    color: #f1accf;
+}
+
+input {
+    padding: 10px;
+    margin: 6px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    outline: none;
+    transition: 0.3s;
+}
+
+input:focus {
+    border-color: #fdbadc;
+    box-shadow: 0 0 5px #f3b3d3;
+}
+
+button {
+    margin: 5px;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+button:hover {
+    transform: scale(1.05);
+}
+
+button:not(.btn-editar):not(.btn-eliminar) {
+    background: #f5acd0;
+    color: white;
+}
+
+.btn-editar {
+    background: orange;
+    color: white;
+}
+
+.btn-eliminar {
+    background: red;
+    color: white;
+}
+
+.productos {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.card {
+    background: white;
+    width: 220px;
+    margin: 12px;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card h3 {
+    color: #f5a3cc;
+}
+
+.card p {
+    margin: 5px 0;
+}
+
+#totalAcumulado {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-top: 10px;
+}
+</style>
+
+</head>
+
+<body>
+
+<header>
+<h1>💄 Tienda de Cosméticos</h1>
+</header>
+
+<!-- PESTAÑAS -->
+<div style="margin-top:10px;">
+    <button onclick="mostrar('productos')">🧴 Productos</button>
+    <button onclick="mostrar('carrito')">🛒 Carrito</button>
+</div>
+
+<div class="container">
+
+<h3>Agregar producto</h3>
+<input type="text" id="nombre" placeholder="Nombre">
+<input type="text" id="marca" placeholder="Marca">
+<input type="number" id="precio" placeholder="Precio">
+<button onclick="agregarProducto()">Agregar</button>
+
+<p id="totalAcumulado">Total acumulado: $0</p>
+
+<!-- VISTA PRODUCTOS -->
+<div id="vista-productos">
+    <div id="productos" class="productos"></div>
+</div>
+
+<!-- VISTA CARRITO -->
+<div id="vista-carrito" style="display:none;">
+    <h3>🛒 Carrito</h3>
+    <div id="carrito"></div>
+</div>
+
+</div>
+
+<script>
+
+let productosGlobal = [];
+let editandoId = null;
+let carrito = [];
+
+function cargar() {
+    fetch('http://127.0.0.1:5000/productos')
+    .then(r => r.json())
+    .then(data => {
+        productosGlobal = data.productos;
+        pintarProductos(productosGlobal);
+        document.getElementById("totalAcumulado").innerText = "Total acumulado: $" + data.total;
+    });
+}
+
+function pintarProductos(data) {
+    let cont = document.getElementById('productos');
+    cont.innerHTML = "";
+
+    data.forEach(p => {
+        cont.innerHTML += `
+        <div class="card">
+            <h3>${p.nombre}</h3>
+            <p>${p.marca}</p>
+            <p>$${p.precio}</p>
+
+            <button onclick="agregarCarrito('${p.id}', \`${p.nombre}\`, ${p.precio})">🛒</button>
+
+            <button class="btn-editar" onclick="editarProducto('${p.id}', '${p.nombre}', '${p.marca}', ${p.precio})">Editar</button>
+            <button class="btn-eliminar" onclick="eliminarProducto('${p.id}')">Eliminar</button>
+        </div>
+        `;
+    });
+}
+
+function agregarProducto() {
+
+    let nombre = document.getElementById('nombre').value;
+    let marca = document.getElementById('marca').value;
+    let precioInput = document.getElementById('precio').value;
+
+    if (!nombre || !marca || !precioInput) {
+        alert("Llena todos los campos");
+        return;
+    }
+
+    let data = {
+        nombre: nombre,
+        marca: marca,
+        precio: parseFloat(precioInput)
+    };
+
+    if (editandoId) {
+        fetch('http://127.0.0.1:5000/productos/' + editandoId, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(data)
+        }).then(() => {
+            limpiar();
+            cargar();
+        });
+    } else {
+        fetch('http://127.0.0.1:5000/productos', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(data)
+        }).then(() => {
+            limpiar();
+            cargar();
+        });
+    }
+}
+
+function eliminarProducto(id) {
+    fetch('http://127.0.0.1:5000/productos/' + id, {
+        method: 'DELETE'
+    }).then(() => cargar());
+}
+
+function editarProducto(id, nombre, marca, precio) {
+    document.getElementById('nombre').value = nombre;
+    document.getElementById('marca').value = marca;
+    document.getElementById('precio').value = precio;
+
+    editandoId = id;
+    document.querySelector('button[onclick="agregarProducto()"]').innerText = "Actualizar";
+}
+
+function limpiar() {
+    document.getElementById('nombre').value = "";
+    document.getElementById('marca').value = "";
+    document.getElementById('precio').value = "";
+
+    editandoId = null;
+    document.querySelector('button[onclick="agregarProducto()"]').innerText = "Agregar";
+}
+
+/* ================= CARRITO ================= */
+
+function agregarCarrito(id, nombre, precio) {
+    carrito.push({id, nombre, precio});
+    pintarCarrito();
+}
+
+function pintarCarrito() {
+    let cont = document.getElementById('carrito');
+    cont.innerHTML = "";
+
+    let total = 0;
+
+    carrito.forEach(p => {
+        total += p.precio;
+        cont.innerHTML += `<p>${p.nombre} - $${p.precio}</p>`;
+    });
+
+    cont.innerHTML += `<h3>Total: $${total}</h3>`;
+}
+
+/* ================= VISTAS ================= */
+
+function mostrar(vista) {
+    document.getElementById('vista-productos').style.display = "none";
+    document.getElementById('vista-carrito').style.display = "none";
+
+    if (vista === 'productos') {
+        document.getElementById('vista-productos').style.display = "block";
+    } else {
+        document.getElementById('vista-carrito').style.display = "block";
+    }
+}
+
+cargar();
+
+</script>
+
+</body>
+</html>
